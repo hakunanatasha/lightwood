@@ -1,10 +1,31 @@
 """
+2021.04.26
+
+Adding a binning function to test quantile regression.
+
 2021.03.05
 
 Basic helper functions for PretrainedLang
 """
 import torch
 from transformers import AdamW
+import numpy as np
+
+
+def bin_targets(targets, quantiles=np.arange(0, 1.2, 0.2)):
+    """
+    Given a regression output 
+
+    """
+    pscores = [np.quantile(targets, q) for q in quantiles]
+
+    # Add a little extra to the ends to bin min/max
+    pscores[0] = pscores[0] - np.abs(pscores[0]*0.05)
+    pscores[-1] = pscores[-1] + np.abs(pscores[-1]*0.05)
+
+    # For each element in the targets, digitize and return
+    # the bin it would belong in
+    return np.digitize(targets, pscores)
 
 class TextEmbed(torch.utils.data.Dataset):
     """
