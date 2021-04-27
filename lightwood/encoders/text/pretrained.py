@@ -1,4 +1,12 @@
 """
+2021.04.26 Testing quantile regression
+
+Here, we add a function where if you're explicitly regression with 1 target
+then youll first bin the values, and then create an embedded representation.
+
+This doesn't use MSEloss this way and may create a better "guestimate" embedding
+that differs from other things.
+
 2021.03.18
 
 ## Padding changes the answer slightly in the model.
@@ -60,15 +68,16 @@ class PretrainedLang(BaseEncoder):
     Option to train on a target encoding of choice.
 
     Args:
-    is_target ::Bool; data column is the target of ML.
-    model_name ::str; name of pre-trained model
-    max_training_time ::int; seconds to train
-    custom_tokenizer ::function; custom tokenizing function
-    batch_size  ::int; size of batch
-    max_position_embeddings ::int; max sequence length of input text
-    custom_train ::Bool; If true, trains model on target procided
-    frozen ::Bool; If true, freezes transformer layers during training.
-    epochs ::int; number of epochs to train model with
+    ::param is_target ::Bool; data column is the target of ML.
+    ::param model_name ::str; name of pre-trained model
+    ::param max_training_time ::int; seconds to train
+    ::param custom_tokenizer ::function; custom tokenizing function
+    ::param batch_size  ::int; size of batch
+    ::param max_position_embeddings ::int; max sequence length of input text
+    ::param custom_train ::Bool; If true, trains model on target procided
+    ::param frozen ::Bool; If true, freezes transformer layers during training.
+    ::param epochs ::int; number of epochs to train model with
+    ::param quantiles ::np.ndarray; percentile to bin IF regression
     """
 
     def __init__(
@@ -81,6 +90,7 @@ class PretrainedLang(BaseEncoder):
         custom_train=True,
         frozen=False,
         epochs=1,
+        quantiles=[0, 0.2, 0.4, 0.6, 0.8, 1.0],
     ):
         super().__init__(is_target)
 
@@ -88,6 +98,7 @@ class PretrainedLang(BaseEncoder):
         log.info(self.name)
 
         self._max_len = max_position_embeddings
+        self._quantiles = quantiles
         self._custom_train = custom_train
         self._frozen = frozen
         self._batch_size = batch_size
@@ -128,30 +139,41 @@ class PretrainedLang(BaseEncoder):
         # Checks training data details
         # TODO: Regression flag; currently training supported for categorical only
         output_avail = training_data is not None and len(training_data["targets"]) == 1
+        target_train = (
+            training_data["targets"][0]["output_type"] == COLUMN_DATA_TYPES.CATEGORICAL
+        ) or (training_data["targets"][0]["output_type"] == COLUMN_DATA_TYPES.NUMERICAL)
 
-        if (
-            self._custom_train
-            and output_avail
-            and (
-                training_data["targets"][0]["output_type"]
-                == COLUMN_DATA_TYPES.CATEGORICAL
-            )
-        ):
+        if self._custom_train and output_avail and target_train:
             log.info("Training model.")
 
             # Prepare priming data into tokenized form + attention masks
             text = self._tokenizer(priming_data, truncation=True, padding=True)
 
-            log.info("\tOutput trained is categorical")
+            if (
+                training_data["targets"][0]["output_type"]
+                == COLUMN_DATA_TYPES.NUMERICAL
+            ):
+                # NUMERICAL CASE; REGRESSION IS BINNED
+                log.info("Output is regression; binning regression labels")
+                labels = bin_targets(
+                    training_data["targets"][0]["unencoded_output"],
+                    quantiles=self._quantiles,
+                )
+                label_size = len(set(labels)) + 1
 
-            if training_data["targets"][0]["encoded_output"].shape[1] > 1:
-                labels = training_data["targets"][0]["encoded_output"].argmax(
-                    dim=1
-                )  # Nbatch x N_classes
             else:
-                labels = training_data["targets"][0]["encoded_output"]
+                # OUTPUT IS CATEGORICAL
+                log.info("\tOutput trained is categorical")
+                if training_data["targets"][0]["encoded_output"].shape[1] > 1:
+                    labels = training_data["targets"][0]["encoded_output"].argmax(
+                        dim=1
+                    )  # Nbatch x N_classes
+                else:
+                    labels = training_data["targets"][0]["encoded_output"]
 
-            label_size = len(set(training_data["targets"][0]["unencoded_output"])) + 1
+                label_size = (
+                    len(set(training_data["targets"][0]["unencoded_output"])) + 1
+                )  # alternative is count dimension size
 
             # Construct the model
             self._model = self._classifier_model_class.from_pretrained(
@@ -302,7 +324,7 @@ class PretrainedLang(BaseEncoder):
         self._model.eval()
 
         encoded_representation = []
-        
+
         with torch.no_grad():
             # Set the weights; this is GPT-2
             for text in column_data:
