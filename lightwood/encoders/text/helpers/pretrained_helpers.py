@@ -2,6 +2,7 @@
 2021.04.26
 
 Adding a binning function to test quantile regression.
+Currently in quantile form, might be also worth treating in log-form
 
 2021.03.05
 
@@ -11,15 +12,19 @@ import torch
 from transformers import AdamW
 import numpy as np
 
-
-def bin_targets(targets, quantiles=np.arange(0, 1.2, 0.2)):
+def bin_targets(targets, quantiles):
     """
-    Given a regression output 
+    Given a regression input, convert into digitized bins
+    based on quantiles of the input distribution:
+
+    Args:
+    :param targets, list[int]; list of input distribution of target variable
+    :param quantiles np.ndarray; set of percentiles from [0, 1]
 
     """
     pscores = [np.quantile(targets, q) for q in quantiles]
 
-    # Add a little extra to the ends to bin min/max
+    # Add a little extra to the ends to bin min/max values appropriately
     pscores[0] = pscores[0] - np.abs(pscores[0]*0.05)
     pscores[-1] = pscores[-1] + np.abs(pscores[-1]*0.05)
 
