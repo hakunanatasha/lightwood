@@ -45,7 +45,7 @@ of the output embedding
 import torch
 from torch.utils.data import DataLoader
 
-from lightwood.encoders.text.helpers.pretrained_helpers import TextEmbed
+from lightwood.encoders.text.helpers.pretrained_helpers import TextEmbed, bin_targets
 
 from lightwood.constants.lightwood import COLUMN_DATA_TYPES
 from lightwood.helpers.device import get_devices
@@ -141,7 +141,7 @@ class PretrainedLang(BaseEncoder):
         output_avail = training_data is not None and len(training_data["targets"]) == 1
         target_train = (
             training_data["targets"][0]["output_type"] == COLUMN_DATA_TYPES.CATEGORICAL
-        ) or (training_data["targets"][0]["output_type"] == COLUMN_DATA_TYPES.NUMERICAL)
+        ) or (training_data["targets"][0]["output_type"] == COLUMN_DATA_TYPES.NUMERIC)
 
         if self._custom_train and output_avail and target_train:
             log.info("Training model.")
@@ -149,10 +149,7 @@ class PretrainedLang(BaseEncoder):
             # Prepare priming data into tokenized form + attention masks
             text = self._tokenizer(priming_data, truncation=True, padding=True)
 
-            if (
-                training_data["targets"][0]["output_type"]
-                == COLUMN_DATA_TYPES.NUMERICAL
-            ):
+            if training_data["targets"][0]["output_type"] == COLUMN_DATA_TYPES.NUMERIC:
                 # NUMERICAL CASE; REGRESSION IS BINNED
                 log.info("Output is regression; binning regression labels")
                 labels = bin_targets(
