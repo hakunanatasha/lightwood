@@ -77,7 +77,7 @@ class PretrainedLang(BaseEncoder):
         self,
         is_target=False,
         model_name="distilbert",
-        custom_tokenizer="/home/natasha/Documents/work/2021_04/week4/tokenizers/province.model",
+        custom_tokenizer="/home/natasha/Documents/work/2021_04/week4/tokenizers/province.model", #default NONE
         batch_size=10,
         max_position_embeddings=None,
         custom_train=True,
@@ -130,7 +130,6 @@ class PretrainedLang(BaseEncoder):
                 self._tokenizer_name
             )
 
-        print(self._tokenizer.encode("THIS IS CALIFORNIA [california]"))
         # Replaces empty strings with ''
         priming_data = [x if x is not None else "" for x in priming_data]
 
