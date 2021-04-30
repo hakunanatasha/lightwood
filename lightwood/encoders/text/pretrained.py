@@ -1,4 +1,6 @@
 """
+2021.04.30; enable custom tokenizer for your own tokens.
+Looking to import my own as a default
 2021.03.18
 
 ## Padding changes the answer slightly in the model.
@@ -75,7 +77,7 @@ class PretrainedLang(BaseEncoder):
         self,
         is_target=False,
         model_name="distilbert",
-        custom_tokenizer=None,
+        custom_tokenizer="/home/natasha/Documents/work/2021_04/week4/tokenizers/province.model",
         batch_size=10,
         max_position_embeddings=None,
         custom_train=True,
@@ -94,7 +96,7 @@ class PretrainedLang(BaseEncoder):
         self._epochs = epochs
 
         # Model setup
-        self._tokenizer = custom_tokenizer
+        self._tokenizer_name = custom_tokenizer
         self._model = None
         self.model_type = None
 
@@ -117,9 +119,15 @@ class PretrainedLang(BaseEncoder):
             raise Exception("Encoder is already prepared.")
 
         # TODO: Make tokenizer custom with partial function; feed custom->model
-        if self._tokenizer is None:
+        if self._tokenizer_name is None:
+            log.info("No tokenizer provided, using custom.")
             self._tokenizer = self._tokenizer_class.from_pretrained(
                 self._pretrained_model_name
+            )
+        else:
+            log.info("Using imported tokenizer", self._tokenizer_name)
+            self._tokenizer = self._tokenizer_class.from_pretrained(
+                self._tokenizer_name
             )
 
         # Replaces empty strings with ''
@@ -154,10 +162,14 @@ class PretrainedLang(BaseEncoder):
             label_size = len(set(training_data["targets"][0]["unencoded_output"])) + 1
 
             # Construct the model
-            self._model = self._classifier_model_class.from_pretrained(
-                self._pretrained_model_name,
-                num_labels=label_size,
-            ).to(self.device)
+            self._model = (
+                self._classifier_model_class.from_pretrained(
+                    self._pretrained_model_name,
+                    num_labels=label_size,
+                )
+                .resize_token_embeddings(len(self._tokenizer))
+                .to(self.device)
+            )
 
             # Construct the dataset for training
             xinp = TextEmbed(text, labels)
@@ -223,9 +235,13 @@ class PretrainedLang(BaseEncoder):
             log.info("Embeddings Generator only")
 
             self.model_type = "embeddings_generator"
-            self._model = self._embeddings_model_class.from_pretrained(
-                self._pretrained_model_name
-            ).to(self.device)
+            self._model = (
+                self._embeddings_model_class.from_pretrained(
+                    self._pretrained_model_name
+                )
+                .resize_token_embeddings(len(self._tokenizer))
+                .to(self.device)
+            )
 
         self._prepared = True
 
@@ -302,7 +318,7 @@ class PretrainedLang(BaseEncoder):
         self._model.eval()
 
         encoded_representation = []
-        
+
         with torch.no_grad():
             # Set the weights; this is GPT-2
             for text in column_data:
