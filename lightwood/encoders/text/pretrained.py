@@ -125,11 +125,12 @@ class PretrainedLang(BaseEncoder):
                 self._pretrained_model_name
             )
         else:
-            log.info("Using imported tokenizer", self._tokenizer_name)
+            log.info("Using imported tokenizer" + self._tokenizer_name)
             self._tokenizer = self._tokenizer_class.from_pretrained(
                 self._tokenizer_name
             )
 
+        print(self._tokenizer.encode("THIS IS CALIFORNIA [california]"))
         # Replaces empty strings with ''
         priming_data = [x if x is not None else "" for x in priming_data]
 
@@ -162,14 +163,13 @@ class PretrainedLang(BaseEncoder):
             label_size = len(set(training_data["targets"][0]["unencoded_output"])) + 1
 
             # Construct the model
-            self._model = (
-                self._classifier_model_class.from_pretrained(
-                    self._pretrained_model_name,
-                    num_labels=label_size,
-                )
-                .resize_token_embeddings(len(self._tokenizer))
-                .to(self.device)
-            )
+            self._model = self._classifier_model_class.from_pretrained(
+                self._pretrained_model_name,
+                num_labels=label_size,
+            ).to(self.device)
+
+            if self._tokenizer_name is not None:
+                self._model.resize_token_embeddings(len(self._tokenizer))
 
             # Construct the dataset for training
             xinp = TextEmbed(text, labels)
