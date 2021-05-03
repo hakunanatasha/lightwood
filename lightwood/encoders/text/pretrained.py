@@ -77,7 +77,7 @@ class PretrainedLang(BaseEncoder):
         self,
         is_target=False,
         model_name="distilbert",
-        custom_tokenizer="/home/natasha/Documents/work/2021_04/week4/tokenizers/province.model", #default NONE
+        custom_tokenizer="/home/natasha/Documents/work/2021_04/week4/tokenizers/region_2.model", #default NONE
         batch_size=10,
         max_position_embeddings=None,
         custom_train=True,
